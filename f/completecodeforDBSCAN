@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+
+import rospy
+import tf
+from sensor_msgs.msg import PointCloud2
+from geometry_msgs.msg import Twist
+import sensor_msgs.point_cloud2 as pc2
+import numpy as np
+from sklearn.cluster import DBSCAN
+from std_msgs.msg import Empty  # Import standard message
+
+class GuestFacingRobot:
+    def __init__(self):
+        rospy.init_node('guest_facing_robot', anonymous=True)
+        
+        # Subscribe to the Kinect point cloud topic
+        self.point_cloud_sub = rospy.Subscriber('/camera/depth/points', PointCloud2, self.point_cloud_callback)
+        
+        # Publisher for controlling the robot's movement
+        self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        
+        # Publisher to signal when the task is complete
+        self.completion_pub = rospy.Publisher('/guest_facing_completed', Empty, queue_size=10)
+        
+        self.listener = tf.TransformListener()
+
+    def point_cloud_callback(self, cloud_msg):
+        # Convert PointCloud2 message to a list of points
+        points = []
+        for p in pc2.read_points(cloud_msg, field_names=("x", "y", "z"), skip_nans=True):
+            points.append([p[0], p[1], p[2]])
+        
+        points = np.array(points)
+        
+        # Use DBSCAN to find clusters (people) in the point cloud
+        clustering = DBSCAN(eps=0.5, min_samples=10).fit(points)
+        
+        # Find centroids of each cluster
+        centroids = []
+        for label in np.unique(clustering.labels_):
+            if label == -1:
+                continue  # Skip noise points
+            cluster_points = points[clustering.labels_ == label]
+            centroid = np.mean(cluster_points, axis=0)
+            centroids.append(centroid)
+        
+        # Sequentially face each centroid (guest)
+        for centroid in centroids:
+            self.face_guest(centroid)
+            rospy.sleep(5)  # Face each guest for 5 seconds
+
+        # Signal completion of task
+        self.completion_pub.publish(Empty())
+
+    def face_guest(self, centroid):
+        # Calculate the angle to the guest
+        angle_to_guest = np.arctan2(centroid[1], centroid[0])
+        
+        # Command the robot to rotate towards the guest
+        twist = Twist()
+        twist.angular.z = angle_to_guest
+        self.cmd_vel_pub.publish(twist)
+        
+        # Wait for the robot to finish turning
+        rospy.sleep(2)
+        
+        # Stop the robot after turning
+        twist.angular.z = 0
+        self.cmd_vel_pub.publish(twist)
+
+if __name__ == '__main__':
+    try:
+        robot = GuestFacingRobot()
+        rospy.spin()
+    except rospy.ROSInterruptException:
+        pass
+
