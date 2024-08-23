@@ -52,6 +52,14 @@ class GuestFacingRobot:
         # Signal completion of task
         self.completion_pub.publish(Empty())
 
+    def downsample_point_cloud(self, points, voxel_size=0.05):
+        """Downsamples the point cloud using a voxel grid filter to reduce the number of points."""
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(points)
+        downsampled = point_cloud.voxel_down_sample(voxel_size=voxel_size)
+        return np.asarray(downsampled.points)
+
+
     def face_guest(self, centroid):
         # Calculate the angle to the guest
         angle_to_guest = np.arctan2(centroid[1], centroid[0])
