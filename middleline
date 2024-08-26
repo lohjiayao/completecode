@@ -1,0 +1,53 @@
+import cv2
+
+# Load the Haar Cascade classifier XML file
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+# Open the webcam
+video_capture = cv2.VideoCapture(0)
+
+while True:
+    # Capture frame-by-frame
+    ret, frame = video_capture.read()
+
+    # Get the dimensions of the frame
+    frame_height, frame_width = frame.shape[:2]
+
+    # Calculate the middle vertical line
+    middle_vertical_line = frame_width // 2
+
+    # Convert the frame to grayscale
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Detect faces in the frame
+    faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+    # Draw rectangles around detected faces and calculate the midpoint
+    for (x, y, w, h) in faces:
+        # Calculate the midpoint of the face box
+        midpoint_x = x + w // 2
+        midpoint_y = y + h // 2
+
+        # Draw the face box
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+        # Draw the midpoint
+        cv2.circle(frame, (midpoint_x, midpoint_y), 5, (0, 255, 0), -1)
+
+        # Check if the midpoint is aligned with the middle vertical line
+        if abs(midpoint_x - middle_vertical_line) <= 10:  # Allowing a small margin of error
+            cv2.putText(frame, "Aligned", (10, frame_height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    # Draw the middle vertical line
+    cv2.line(frame, (middle_vertical_line, 0), (middle_vertical_line, frame_height), (0, 255, 255), 2)
+
+    # Display the resulting frame
+    cv2.imshow('Video - Press Q to Exit', frame)
+
+    # Exit the video loop when 'q' is pressed
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the webcam and close the windows
+video_capture.release()
+cv2.destroyAllWindows()
